@@ -26,25 +26,81 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <numeric>
-#include <optional>
+#include <vector>
 
 #include <boost/math/distributions/gamma.hpp>
-
-double gamma(double x);
-double incomplete_gamma(double x, double y);
 
 namespace taily {
 
 struct FeatureStatistics {
+    static constexpr size_t size = 2 * sizeof(double) + sizeof(int);
     double expected_value;
     double variance;
-    double frequency;
+    int frequency;
     FeatureStatistics operator+(const FeatureStatistics& other) const
     {
         return FeatureStatistics{expected_value + other.expected_value,
                                  variance + other.variance,
                                  frequency + other.frequency};
+    }
+
+    std::ostream& to_stream(std::ostream& os) const
+    {
+        os.write(
+            reinterpret_cast<const char*>(&expected_value),
+            sizeof(expected_value));
+        os.write(reinterpret_cast<const char*>(&variance), sizeof(variance));
+        os.write(reinterpret_cast<const char*>(&frequency), sizeof(frequency));
+        return os;
+    }
+
+    static FeatureStatistics from_stream(std::istream& is)
+    {
+        FeatureStatistics stats;
+        is.read(
+            reinterpret_cast<char*>(&stats.expected_value),
+            sizeof(stats.expected_value));
+        is.read(
+            reinterpret_cast<char*>(&stats.variance), sizeof(stats.variance));
+        is.read(
+            reinterpret_cast<char*>(&stats.frequency), sizeof(stats.frequency));
+        return stats;
+    }
+
+    template<typename FeatureRange>
+    static FeatureStatistics
+    from_features(const FeatureRange& features)
+    {
+        return from_features(std::begin(features), std::end(features));
+    }
+
+    template<typename ForwardIterator>
+    static FeatureStatistics
+    from_features(ForwardIterator first, ForwardIterator last)
+    {
+        if (first == last) return FeatureStatistics{0, 0, 0};
+        int count = 0;
+        const double sum = std::accumulate(
+            first,
+            last,
+            double(0.0),
+            [&count](const double& acc, const double& feature) {
+                count += 1;
+                return acc + feature;
+            });
+        const double expected_value = sum / count;
+        const double variance =
+            std::accumulate(
+                first,
+                last,
+                double(0.0),
+                [&expected_value](const double& acc, const double& feature) {
+                    return acc + std::pow(expected_value - feature, 2.0);
+                })
+            / count;
+        return FeatureStatistics{expected_value, variance, count};
     }
 };
 
@@ -63,41 +119,47 @@ double any(const CollectionStatistics& stats)
         stats.term_stats.end(),
         1.0,
         [collection_size](const auto& acc, const FeatureStatistics& stats) {
-            return 1.0 - stats.frequency / collection_size;
+            return acc * (1.0 - double(stats.frequency) / collection_size);
         });
     return collection_size * (1.0 - any_product);
 }
 
 /// Extimates the number of documents containing **all** of the terms
 /// represented by `term_stats` in a collection of size `collection_size`.
-///
-/// If `any` is provided, it should be the same value as that calculated
-/// by executing `any()`.
-/// Otherwise, `any()` will be executed within this function.
-double
-all(const CollectionStatistics& stats,
-    const std::optional<double> any = std::nullopt)
+double all(const CollectionStatistics& stats)
 {
-    const double any_value = any.value_or(taily::any(stats));
+    const double any = taily::any(stats);
+    if (any == 0.0) {
+        return 0.0;
+    }
     const double all_product = std::accumulate(
         stats.term_stats.begin(),
         stats.term_stats.end(),
         1.0,
-        [any_value](const auto& acc, const FeatureStatistics& stats) {
-            return stats.frequency / any_value;
+        [any](const auto& acc, const FeatureStatistics& stats) {
+            return acc * (stats.frequency / any);
         });
-    return any_value * all_product;
+    return any * all_product;
 }
 
 /// Returns a gamma distribution fitted to `term_stats`.
+auto fit_distribution(const FeatureStatistics& query_term_stats)
+{
+    const double k = std::pow(query_term_stats.expected_value, 2.0)
+        / query_term_stats.variance;
+    const double theta =
+        query_term_stats.variance / query_term_stats.expected_value;
+    return boost::math::gamma_distribution<>(k, theta);
+}
+
+/// Returns a gamma distribution fitted to a vector of term stats.
+///
+/// The term statictics are accumulated before the distribution is fitted.
 auto fit_distribution(const std::vector<FeatureStatistics>& term_stats)
 {
     FeatureStatistics query_stats = std::accumulate(
         term_stats.begin(), term_stats.end(), FeatureStatistics{0, 0, 0});
-    const double k =
-        std::pow(query_stats.expected_value, 2.0) / query_stats.variance;
-    const double theta = query_stats.variance / query_stats.expected_value;
-    return boost::math::gamma_distribution<>(k, theta);
+    return fit_distribution(query_stats);
 }
 
 /// Estimates the global cutoff score for the entire collection.
@@ -110,15 +172,19 @@ estimate_cutoff(const CollectionStatistics& stats, int ntop)
     return boost::math::quantile(complement(dist, p_c));
 }
 
-double estimate_number_above_cutoff(
-    const std::vector<FeatureStatistics>& term_stats,
-    const double global_score_cutoff,
-    const double all_in_shard,
-    const double normalization_factor = 1.0)
+/// Calculates the probability that a document in a shard given by `stats`
+/// has a score higher than `cutoff`.
+double calculate_cdf(const double cutoff, const CollectionStatistics& stats)
 {
-    auto dist = fit_distribution(term_stats);
-    double p = boost::math::cdf(complement(dist, global_score_cutoff));
-    return p * all_in_shard * normalization_factor;
+    FeatureStatistics query_stats = std::accumulate(
+        stats.term_stats.begin(),
+        stats.term_stats.end(),
+        FeatureStatistics{0, 0, 0});
+    if (query_stats.expected_value == 0 || query_stats.variance == 0) {
+        return 0.0;
+    }
+    auto dist = fit_distribution(query_stats);
+    return boost::math::cdf(complement(dist, cutoff));
 }
 
 /// Scores shards given by `shard_stats`.
@@ -144,33 +210,32 @@ std::vector<double> score_shards(
     const double global_all = all(global_stats);
     const double global_cutoff = estimate_cutoff(global_stats, ntop);
 
-    std::vector<double> shard_probs(shard_count);
+    std::vector<double> shard_coefs(shard_count);
     std::transform(
         std::begin(shard_stats),
         std::end(shard_stats),
-        std::begin(shard_probs),
-        [global_cutoff](const auto& shard_stats) {
-            auto dist = fit_distribution(shard_stats.term_stats);
-            return boost::math::cdf(complement(dist, global_cutoff));
-        });
+        std::begin(shard_coefs),
+        std::bind(calculate_cdf, global_cutoff, std::placeholders::_1));
 
     std::transform(
-        std::begin(shard_probs),
-        std::end(shard_probs),
+        std::begin(shard_coefs),
+        std::end(shard_coefs),
         std::begin(shard_all),
-        std::begin(shard_probs),
+        std::begin(shard_coefs),
         std::multiplies<double>());
 
     const double normalization_factor =
-        std::accumulate(std::begin(shard_probs), std::end(shard_probs), 0.0);
+        std::accumulate(std::begin(shard_coefs), std::end(shard_coefs), 0.0);
 
     std::vector<double> estimates(shard_count);
     std::transform(
-        std::begin(shard_probs),
-        std::end(shard_probs),
+        std::begin(shard_coefs),
+        std::end(shard_coefs),
         std::begin(estimates),
-        [normalization_factor](const auto& element) {
-            return element * normalization_factor;
+        [ntop, normalization_factor](const auto& element) {
+            return normalization_factor > 0
+                ? element * ntop / normalization_factor
+                : 0.0;
         });
     return estimates;
 }
