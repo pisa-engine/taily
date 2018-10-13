@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/elshize/taily.svg?branch=master)](https://travis-ci.org/elshize/taily)
+
 This library implements Taily algorithm as described by Aly et al.
 in the 2013 paper
 [Taily: shard selection using the tail of score distributions](https://dl.acm.org/citation.cfm?id=2484033).
