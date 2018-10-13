@@ -2,7 +2,11 @@ language: cpp
 compiler:
     - gcc
     - clang
+addons:
+  apt:
+    packages:
+      - libboost-all-dev
 script:
-    - cmake .
-    - cmake --build .
-    - ctest
+  - cmake .
+  - cmake --build .
+  - ctest
