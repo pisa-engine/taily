@@ -8,7 +8,7 @@ target_include_directories(taily INTERFACE
     $<BUILD_INTERFACE:${taily_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>)
 
-find_package(Boost COMPONENTS iostreams REQUIRED)
+find_package(Boost REQUIRED)
 target_link_libraries(taily INTERFACE Boost::boost)
 install(FILES include/taily.hpp DESTINATION include)
 export(PACKAGE taily)

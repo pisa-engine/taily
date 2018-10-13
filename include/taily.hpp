@@ -30,6 +30,8 @@
 #include <numeric>
 #include <vector>
 
+//#define _STDLIB_H
+//#define BOOST_MPL_PREPROCESSING_MODE
 #include <boost/math/distributions/gamma.hpp>
 
 namespace taily {
@@ -189,10 +191,10 @@ double calculate_cdf(const double cutoff, const CollectionStatistics& stats)
 
 /// Scores shards given by `shard_stats`.
 ///
-/// \param  global_stats    Term statistics for the entire collection
-/// \param  shard_stats     Term statistics for individual shards
-/// \param  ntop            The parameter to Taily algorithm saying how many
-///                         top results we are shooting for
+/// \param global_stats Term statistics for the entire collection
+/// \param shard_stats Term statistics for individual shards
+/// \param ntop The parameter to Taily algorithm saying how many top results we
+/// are shooting for
 std::vector<double> score_shards(
     const CollectionStatistics& global_stats,
     const std::vector<CollectionStatistics>& shard_stats,
