@@ -12,7 +12,8 @@ in the 2013 paper
 
 # Dependencies
 
-The only dependency is [Boost.Math](https://www.boost.org/doc/libs/1_68_0/libs/math/doc/html/index.html)
+Library compiles with GCC >= 4.9 and Clang >= 4, and it requires C++14.
+The only other dependency is [Boost.Math](https://www.boost.org/doc/libs/1_68_0/libs/math/doc/html/index.html)
 library used for Gamma distribution.
 
 # Usage
