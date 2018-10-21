@@ -24,6 +24,8 @@
 /// \author Michal Siedlaczek
 /// \copyright MIT License
 
+#pragma once
+
 #include <algorithm>
 #include <cmath>
 #include <functional>
