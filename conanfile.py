@@ -1,4 +1,4 @@
-from conans import ConanFile, tools
+from conans import ConanFile, tools, CMake
 import os
 
 
@@ -10,8 +10,13 @@ class TailyConan(ConanFile):
     url = "https://github.com/elshize/taily"
     code_url = "https://github.com/elshize/taily"
     build_policy="missing"
-    exports_sources = ("LICENSE", "README.md", "include/*",
+    exports_sources = ("LICENSE", "README.md", "include/*", "examples/*",
                        "cmake/*", "CMakeLists.txt", "test/*")
 
     def package(self):
-        self.copy("*.hpp", dst="include", src="include")
+        cmake = CMake(self)
+        cmake.configure()
+        self.copy("*", dst="include", src="include")
+        self.copy("tailyConfig.cmake")
+        self.copy("tailyConfigVersion.cmake")
+        self.copy("tailyTargets.cmake")
