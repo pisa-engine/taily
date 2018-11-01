@@ -4,6 +4,10 @@ This library implements Taily algorithm as described by Aly et al.
 in the 2013 paper
 [Taily: shard selection using the tail of score distributions](https://dl.acm.org/citation.cfm?id=2484033).
 
+### Disclaimer
+
+At this early stage of development, the library interface is subject to changes. If you rely on it now, I advise to use a specific git tag.
+
 # Installation
 
 `taily` is a header-only library. For now, copy and include `include/taily.hpp` file.
