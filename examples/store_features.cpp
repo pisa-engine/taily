@@ -30,24 +30,23 @@
 #include <random>
 #include <vector>
 
-std::vector<std::vector<double>> full_index = {
-    {7, 2, 6, 11, 1, 1, 1, 3, 8, 15},
-    {9, 2},
-    {11, 7, 14, 15, 12, 2, 11, 5, 5, 15, 4, 10, 4, 10},
-    {6, 8, 1, 4, 6},
-    {1, 12, 15, 9, 8, 8, 2}};
+std::vector<std::vector<double>> full_index = {{7, 2, 6, 11, 1, 1, 1, 3, 8, 15},
+                                               {9, 2},
+                                               {11, 7, 14, 15, 12, 2, 11, 5, 5, 15, 4, 10, 4, 10},
+                                               {6, 8, 1, 4, 6},
+                                               {1, 12, 15, 9, 8, 8, 2}};
 
 std::vector<std::vector<std::vector<double>>> shards = {
     {{7, 2, 6}, {9}, {11, 7, 14, 15}, {6}, {}},
     {{11, 1, 1, 1}, {2}, {12, 2, 11, 5, 5, 15, 4, 10}, {8, 1, 4}, {}},
     {{3, 8, 15}, {}, {4, 10}, {6}, {1, 12, 15, 9, 8, 8, 2}}};
 
-void write_stats_for_index(
-    const std::vector<std::vector<double>>& scores, const std::string& filename)
+void write_stats_for_index(std::vector<std::vector<double>> const& scores,
+                           std::string const& filename)
 {
     std::ofstream ofs(filename);
     for (const std::vector<double>& term_scores : scores) {
-        auto term_stats = taily::FeatureStatistics::from_features(term_scores);
+        auto term_stats = taily::Feature_Statistics::from_features(term_scores);
         term_stats.to_stream(ofs);
     }
 }

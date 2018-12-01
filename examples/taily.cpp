@@ -33,32 +33,31 @@
 
 using namespace taily;
 
-std::vector<FeatureStatistics>
-read_stats(const std::vector<int>& terms, const std::string& file)
+[[nodiscard]] auto read_stats(std::vector<int> const& terms, std::string const& file)
+    -> std::vector<Feature_Statistics>
 {
     std::ifstream ifs(file);
-    std::vector<FeatureStatistics> stats;
+    std::vector<Feature_Statistics> stats;
     for (int term : terms) {
-        ifs.seekg(term * FeatureStatistics::size);
-        stats.push_back(FeatureStatistics::from_stream(ifs));
+        ifs.seekg(term * Feature_Statistics::struct_size);
+        stats.push_back(Feature_Statistics::from_stream(ifs));
     }
     return stats;
 }
 
 int main(int argc, char** argv)
 {
-    const int term_count = 5;
-    const int shard_count = 3;
+    int const term_count = 5;
+    int const shard_count = 3;
     /* All shards the same size */
-    const int shard_size = 10;
-    const int full_size = shard_size * shard_count;
-    const int ntop = 50;
-    const int query_count = 10;
+    int const shard_size = 10;
+    int const full_size = shard_size * shard_count;
+    int const ntop = 50;
+    int const query_count = 10;
 
     std::mt19937 gen(97);
     std::uniform_int_distribution<> query_len_dist(1, 3);
     for (int query = 0; query < query_count; query++) {
-
         /* Generate query */
         std::vector<int> terms = {0, 1, 2, 3, 4};
         std::random_shuffle(terms.begin(), terms.end());
@@ -69,13 +68,10 @@ int main(int argc, char** argv)
         }
         std::cout << '\n';
 
-        CollectionStatistics full_stats{
-            read_stats(terms, "full_index.stats"), full_size};
-        std::vector<CollectionStatistics> shard_stats;
+        Query_Statistics full_stats{read_stats(terms, "full_index.stats"), full_size};
+        std::vector<Query_Statistics> shard_stats;
         for (int shard = 0; shard < shard_count; shard++) {
-            CollectionStatistics stats{
-                read_stats(terms, std::to_string(shard) + ".stats"),
-                shard_size};
+            Query_Statistics stats{read_stats(terms, std::to_string(shard) + ".stats"), shard_size};
             shard_stats.push_back(std::move(stats));
         }
         auto scored_shards = score_shards(full_stats, shard_stats, ntop);

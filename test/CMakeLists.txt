@@ -44,5 +44,5 @@ target_link_libraries(unit_tests
     taily
     gtest_main
     gmock_main gmock)
-target_compile_features(unit_tests PRIVATE cxx_std_14)
+target_compile_features(unit_tests PRIVATE cxx_std_17)
 gtest_add_tests(TARGET unit_tests)

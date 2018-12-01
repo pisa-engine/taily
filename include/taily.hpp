@@ -32,97 +32,84 @@
 #include <numeric>
 #include <vector>
 
-//#define _STDLIB_H
-//#define BOOST_MPL_PREPROCESSING_MODE
 #include <boost/math/distributions/gamma.hpp>
 
 namespace taily {
 
-struct FeatureStatistics {
-    static constexpr size_t size = 2 * sizeof(double) + sizeof(int);
+struct Feature_Statistics {
+    static constexpr std::size_t struct_size = 2 * sizeof(double) + sizeof(int);
     double expected_value;
     double variance;
-    int frequency;
-    FeatureStatistics operator+(const FeatureStatistics& other) const
+    std::int64_t frequency;
+
+    [[nodiscard]] constexpr auto
+    operator+(Feature_Statistics const& other) const -> Feature_Statistics
     {
-        return FeatureStatistics{expected_value + other.expected_value,
-                                 variance + other.variance,
-                                 frequency + other.frequency};
+        return Feature_Statistics{expected_value + other.expected_value,
+                                  variance + other.variance,
+                                  frequency + other.frequency};
     }
 
-    std::ostream& to_stream(std::ostream& os) const
+    auto to_stream(std::ostream& os) const -> std::ostream&
     {
-        os.write(
-            reinterpret_cast<const char*>(&expected_value),
-            sizeof(expected_value));
+        os.write(reinterpret_cast<const char*>(&expected_value), sizeof(expected_value));
         os.write(reinterpret_cast<const char*>(&variance), sizeof(variance));
         os.write(reinterpret_cast<const char*>(&frequency), sizeof(frequency));
         return os;
     }
 
-    static FeatureStatistics from_stream(std::istream& is)
+    [[nodiscard]] static auto from_stream(std::istream& is) -> Feature_Statistics
     {
-        FeatureStatistics stats;
-        is.read(
-            reinterpret_cast<char*>(&stats.expected_value),
-            sizeof(stats.expected_value));
-        is.read(
-            reinterpret_cast<char*>(&stats.variance), sizeof(stats.variance));
-        is.read(
-            reinterpret_cast<char*>(&stats.frequency), sizeof(stats.frequency));
+        Feature_Statistics stats;
+        is.read(reinterpret_cast<char*>(&stats.expected_value), sizeof(stats.expected_value));
+        is.read(reinterpret_cast<char*>(&stats.variance), sizeof(stats.variance));
+        is.read(reinterpret_cast<char*>(&stats.frequency), sizeof(stats.frequency));
         return stats;
     }
 
-    template<typename FeatureRange>
-    static FeatureStatistics
-    from_features(const FeatureRange& features)
+    template<typename Feature_Range>
+    [[nodiscard]] static constexpr auto
+    from_features(Feature_Range const& features) -> Feature_Statistics
     {
         return from_features(std::begin(features), std::end(features));
     }
 
-    template<typename ForwardIterator>
-    static FeatureStatistics
-    from_features(ForwardIterator first, ForwardIterator last)
+    template<typename Forward_Iterator>
+    [[nodiscard]] static constexpr auto
+    from_features(Forward_Iterator first, Forward_Iterator last) -> Feature_Statistics
     {
-        if (first == last) return FeatureStatistics{0, 0, 0};
-        int count = 0;
-        const double sum = std::accumulate(
-            first,
-            last,
-            double(0.0),
-            [&count](const double& acc, const double& feature) {
-                count += 1;
-                return acc + feature;
-            });
-        const double expected_value = sum / count;
-        const double variance =
-            std::accumulate(
-                first,
-                last,
-                double(0.0),
-                [&expected_value](const double& acc, const double& feature) {
-                    return acc + std::pow(expected_value - feature, 2.0);
-                })
+        if (first == last) return Feature_Statistics{0, 0, 0};
+        std::int64_t count{0};
+        auto accumulate_feature = [&count](double const& acc, double const& feature) {
+            count += 1;
+            return acc + feature;
+        };
+        double const sum = std::accumulate(first, last, double{0.0}, accumulate_feature);
+        double const expected_value = sum / count;
+        auto accumulate_squared = [&expected_value](double const& acc, double const& feature) {
+            return acc + std::pow(expected_value - feature, 2.0);
+        };
+        double const variance = std::accumulate(first, last, double{0.0}, accumulate_squared)
             / count;
-        return FeatureStatistics{expected_value, variance, count};
+        return Feature_Statistics{expected_value, variance, count};
     }
 };
 
-struct CollectionStatistics {
-    std::vector<FeatureStatistics> term_stats;
-    int size;
+struct Query_Statistics {
+    std::vector<Feature_Statistics> term_stats;
+    std::int64_t collection_size;
 };
 
 /// Extimates the number of documents containing **any** of the terms
 /// represented by `term_stats` in a collection of size `collection_size`.
-double any(const CollectionStatistics& stats)
+[[nodiscard]] auto any(Query_Statistics const& stats) -> double
 {
-    const auto collection_size = stats.size;
+    const auto collection_size = stats.collection_size;
     const double any_product = std::accumulate(
         stats.term_stats.begin(),
         stats.term_stats.end(),
         1.0,
-        [collection_size](const auto& acc, const FeatureStatistics& stats) {
+        [collection_size](const auto& acc, const Feature_Statistics& stats) {
             return acc * (1.0 - double(stats.frequency) / collection_size);
         });
     return collection_size * (1.0 - any_product);
@@ -130,24 +117,25 @@ double any(const CollectionStatistics& stats)
 
 /// Extimates the number of documents containing **all** of the terms
 /// represented by `term_stats` in a collection of size `collection_size`.
-double all(const CollectionStatistics& stats)
+[[nodiscard]] auto all(const Query_Statistics& stats) -> double
 {
-    const double any = taily::any(stats);
+    double const any = taily::any(stats);
     if (any == 0.0) {
         return 0.0;
     }
-    const double all_product = std::accumulate(
+    double const all_product = std::accumulate(
         stats.term_stats.begin(),
         stats.term_stats.end(),
         1.0,
-        [any](const auto& acc, const FeatureStatistics& stats) {
+        [any](auto const& acc, Feature_Statistics const& stats) {
             return acc * (stats.frequency / any);
         });
     return any * all_product;
 }
 
 /// Returns a gamma distribution fitted to `term_stats`.
-auto fit_distribution(const FeatureStatistics& query_term_stats)
+[[nodiscard]] auto
+fit_distribution(Feature_Statistics const& query_term_stats) -> boost::math::gamma_distribution<>
 {
     const double k = std::pow(query_term_stats.expected_value, 2.0)
         / query_term_stats.variance;
@@ -159,31 +147,33 @@ auto fit_distribution(const FeatureStatistics& query_term_stats)
 /// Returns a gamma distribution fitted to a vector of term stats.
 ///
 /// The term statictics are accumulated before the distribution is fitted.
-auto fit_distribution(const std::vector<FeatureStatistics>& term_stats)
+[[nodiscard]] auto fit_distribution(std::vector<Feature_Statistics> const& term_stats)
+    -> boost::math::gamma_distribution<>
 {
-    FeatureStatistics query_stats = std::accumulate(
-        term_stats.begin(), term_stats.end(), FeatureStatistics{0, 0, 0});
+    Feature_Statistics query_stats = std::accumulate(
+        term_stats.begin(), term_stats.end(), Feature_Statistics{0, 0, 0});
     return fit_distribution(query_stats);
 }
 
 /// Estimates the global cutoff score for the entire collection.
-double
-estimate_cutoff(const CollectionStatistics& stats, int ntop)
+[[nodiscard]] auto estimate_cutoff(Query_Statistics const& stats, int ntop) -> double
 {
-    auto dist = fit_distribution(stats.term_stats);
-    auto all = taily::all(stats);
-    const double p_c = std::min(1.0, ntop / all);
+    auto const dist = fit_distribution(stats.term_stats);
+    double const all = taily::all(stats);
+    double const p_c = std::min(1.0, ntop / all);
     return boost::math::quantile(complement(dist, p_c));
 }
 
 /// Calculates the probability that a document in a shard given by `stats`
 /// has a score higher than `cutoff`.
-double calculate_cdf(const double cutoff, const CollectionStatistics& stats)
+[[nodiscard]] auto calculate_cdf(double const cutoff, Query_Statistics const& stats) -> double
+// [[expects: cutoff >= 0.0]]
 {
-    FeatureStatistics query_stats = std::accumulate(
-        stats.term_stats.begin(),
-        stats.term_stats.end(),
-        FeatureStatistics{0, 0, 0});
+    if (cutoff <= 0) {
+        return 1.0;
+    }
+    Feature_Statistics query_stats = std::accumulate(
+        stats.term_stats.begin(), stats.term_stats.end(), Feature_Statistics{0, 0, 0});
     if (query_stats.expected_value == 0 || query_stats.variance == 0) {
         return 0.0;
     }
@@ -197,50 +187,42 @@ double calculate_cdf(const double cutoff, const CollectionStatistics& stats)
 /// \param shard_stats Term statistics for individual shards
 /// \param ntop The parameter to Taily algorithm saying how many top results we
 /// are shooting for
-std::vector<double> score_shards(
-    const CollectionStatistics& global_stats,
-    const std::vector<CollectionStatistics>& shard_stats,
-    const int ntop)
+[[nodiscard]] auto score_shards(Query_Statistics const& global_stats,
+                                std::vector<Query_Statistics> const& shard_stats,
+                                int const ntop) -> std::vector<double>
 {
-    const int shard_count = shard_stats.size();
+    int const shard_count = shard_stats.size();
 
     std::vector<double> shard_all(shard_count);
-    std::transform(
-        std::begin(shard_stats),
-        std::end(shard_stats),
-        std::begin(shard_all),
-        [](const auto& shard_stats) { return taily::all(shard_stats); });
+    std::transform(std::begin(shard_stats),
+                   std::end(shard_stats),
+                   std::begin(shard_all),
+                   [](auto const& shard_stats) { return taily::all(shard_stats); });
 
-    const double global_all = all(global_stats);
-    const double global_cutoff = estimate_cutoff(global_stats, ntop);
+    double const global_all = all(global_stats);
+    double const global_cutoff = estimate_cutoff(global_stats, ntop);
 
     std::vector<double> shard_coefs(shard_count);
-    std::transform(
-        std::begin(shard_stats),
-        std::end(shard_stats),
-        std::begin(shard_coefs),
-        std::bind(calculate_cdf, global_cutoff, std::placeholders::_1));
+    std::transform(std::begin(shard_stats),
+                   std::end(shard_stats),
+                   std::begin(shard_coefs),
+                   std::bind(calculate_cdf, global_cutoff, std::placeholders::_1));
 
-    std::transform(
-        std::begin(shard_coefs),
-        std::end(shard_coefs),
-        std::begin(shard_all),
-        std::begin(shard_coefs),
-        std::multiplies<double>());
+    std::transform(std::begin(shard_coefs),
+                   std::end(shard_coefs),
+                   std::begin(shard_all),
+                   std::begin(shard_coefs),
+                   std::multiplies<double>());
 
-    const double normalization_factor =
-        std::accumulate(std::begin(shard_coefs), std::end(shard_coefs), 0.0);
+    double const normalization_factor = std::accumulate(
+        std::begin(shard_coefs), std::end(shard_coefs), 0.0);
 
     std::vector<double> estimates(shard_count);
+    auto normalize = [ntop, normalization_factor](auto const& element) {
+        return normalization_factor > 0 ? element * ntop / normalization_factor : 0.0;
+    };
     std::transform(
-        std::begin(shard_coefs),
-        std::end(shard_coefs),
-        std::begin(estimates),
-        [ntop, normalization_factor](const auto& element) {
-            return normalization_factor > 0
-                ? element * ntop / normalization_factor
-                : 0.0;
-        });
+        std::begin(shard_coefs), std::end(shard_coefs), std::begin(estimates), normalize);
     return estimates;
 }
 
