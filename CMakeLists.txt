@@ -17,6 +17,9 @@ set(TAILY_CMAKE_PROJECT_CONFIG_FILE
 set(TAILY_CMAKE_PROJECT_TARGETS_FILE
     "${TAILY_CMAKE_CONFIG_DIR}/${PROJECT_NAME}Targets.cmake")
 
+option(TAILY_ENABLE_TESTING "Enable testing of the library." ON)
+option(TAILY_BUILD_EXAMPLE "Build example tool." ON)
+
 #
 # ADD LIBRARY
 #
@@ -31,9 +34,14 @@ target_include_directories(
 find_package(Boost REQUIRED)
 target_link_libraries(taily INTERFACE Boost::boost)
 
+if (TAILY_BUILD_EXAMPLE)
 add_subdirectory(examples)
+endif()
+
+if (TAILY_ENABLE_TESTING AND BUILD_TESTING)
 enable_testing()
 add_subdirectory(test)
+endif()
 
 #
 # INSTALL install header files, generate and install cmake config files for
