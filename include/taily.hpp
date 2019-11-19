@@ -31,6 +31,7 @@
 #include <functional>
 #include <numeric>
 #include <vector>
+#include <limits>
 
 #include <boost/math/distributions/gamma.hpp>
 
@@ -137,10 +138,10 @@ struct Query_Statistics {
 [[nodiscard]] auto
 fit_distribution(Feature_Statistics const& query_term_stats) -> boost::math::gamma_distribution<>
 {
-    const double k = std::pow(query_term_stats.expected_value, 2.0)
-        / query_term_stats.variance;
-    const double theta =
-        query_term_stats.variance / query_term_stats.expected_value;
+    double epsilon = std::numeric_limits<double>::epsilon;
+    double variance = std::max(epsilon, query_term_stats.variance);
+    const double k = std::pow(query_term_stats.expected_value, 2.0) / variance;
+    const double theta = variance / query_term_stats.expected_value;
     return boost::math::gamma_distribution<>(k, theta);
 }
 
