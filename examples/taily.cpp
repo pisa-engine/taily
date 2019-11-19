@@ -30,6 +30,7 @@
 #include <iostream>
 #include <random>
 #include <vector>
+#include <algorithm>
 
 using namespace taily;
 
@@ -60,7 +61,10 @@ int main(int argc, char** argv)
     for (int query = 0; query < query_count; query++) {
         /* Generate query */
         std::vector<int> terms = {0, 1, 2, 3, 4};
-        std::random_shuffle(terms.begin(), terms.end());
+
+        std::random_device rd;
+        std::mt19937 g(rd());
+        std::shuffle(terms.begin(), terms.end(), g);
         terms.resize(query_len_dist(gen));
         std::cout << "Query " << query << " with terms:";
         for (int term : terms) {
