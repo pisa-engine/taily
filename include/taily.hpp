@@ -138,7 +138,7 @@ struct Query_Statistics {
 [[nodiscard]] auto
 fit_distribution(Feature_Statistics const& query_term_stats) -> boost::math::gamma_distribution<>
 {
-    double epsilon = std::numeric_limits<double>::epsilon;
+    double epsilon = std::numeric_limits<double>::epsilon();
     double variance = std::max(epsilon, query_term_stats.variance);
     const double k = std::pow(query_term_stats.expected_value, 2.0) / variance;
     const double theta = variance / query_term_stats.expected_value;
