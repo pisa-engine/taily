@@ -159,6 +159,10 @@ fit_distribution(Feature_Statistics const& query_term_stats) -> boost::math::gam
 /// Estimates the global cutoff score for the entire collection.
 [[nodiscard]] auto estimate_cutoff(Query_Statistics const& stats, int ntop) -> double
 {
+    if(stats.term_stats.size() == 0)
+    {
+        return 0.0;
+    }
     auto const dist = fit_distribution(stats.term_stats);
     double const all = taily::all(stats);
     double const p_c = std::min(1.0, ntop / all);
