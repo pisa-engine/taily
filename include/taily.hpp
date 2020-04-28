@@ -38,7 +38,7 @@
 namespace taily {
 
 struct Feature_Statistics {
-    static constexpr std::size_t struct_size = 2 * sizeof(double) + sizeof(int);
+    static constexpr std::size_t struct_size = 2 * sizeof(double) + sizeof(std::int64_t);
     double expected_value;
     double variance;
     std::int64_t frequency;
