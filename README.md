@@ -27,8 +27,8 @@ shards with respect to one query:
 
 ```c++
 std::vector<double> score_shards(
-    const CollectionStatistics& global_stats,
-    const std::vector<CollectionStatistics>& shard_stats,
+    const Query_Statistics& global_stats,
+    const std::vector<Query_Statistics>& shard_stats,
     const int ntop)
 ```
 
@@ -36,12 +36,12 @@ std::vector<double> score_shards(
 vector represents the shards, and `ntop` is the parameter of Taily---the
 number top results for which a score threshold will be estimated.
 
-`CollectionStatistics` is a simple structure that contains the collection size
+`Query_Statistics` is a simple structure that contains the collection size
 and a vector of of length equal to the number of query terms.
 
 ```c++
-struct CollectionStatistics {
-    std::vector<FeatureStatistics> term_stats;
+struct Query_Statistics {
+    std::vector<Feature_Statistics> term_stats;
     int size;
 };
 ```
@@ -49,16 +49,16 @@ struct CollectionStatistics {
 Each element of `term_stats` contains the values needed for computations:
 
 ```c++
-struct FeatureStatistics {
+struct Feature_Statistics {
     double expected_value;
     double variance;
     int frequency;
 
     template<typename FeatureRange>
-    static FeatureStatistics from_features(const FeatureRange& features);
+    static Feature_Statistics from_features(const FeatureRange& features);
 
     template<typename ForwardIterator>
-    static FeatureStatistics from_features(ForwardIterator first, ForwardIterator last);
+    static Feature_Statistics from_features(ForwardIterator first, ForwardIterator last);
 };
 ```
 
@@ -69,14 +69,14 @@ you can use the helper functions `from_features()` to computes statistics:
 
 ```c++
 const std::vector<double>& features = fetch_or_generate_features(term);
-auto stats = FeatureStatistics::from_features(features);
+auto stats = Feature_Statistics::from_features(features);
 ```
 
 or
 
 ```c++
 double* features = fetch_or_generate_features(term);
-auto stats = FeatureStatistics::from_features(features, features + len);
+auto stats = Feature_Statistics::from_features(features, features + len);
 ```
 
 The first one takes any forward range, such as `std::vector`, `std::array`,
