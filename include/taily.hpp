@@ -28,10 +28,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <functional>
+#include <limits>
 #include <numeric>
 #include <vector>
-#include <limits>
 
 #include <boost/math/distributions/gamma.hpp>
 
@@ -51,7 +52,7 @@ struct Feature_Statistics {
                                   frequency + other.frequency};
     }
 
-    auto to_stream(std::ostream& os) const -> std::ostream&
+    inline auto to_stream(std::ostream& os) const -> std::ostream&
     {
         os.write(reinterpret_cast<const char*>(&expected_value), sizeof(expected_value));
         os.write(reinterpret_cast<const char*>(&variance), sizeof(variance));
@@ -59,9 +60,9 @@ struct Feature_Statistics {
         return os;
     }
 
-    [[nodiscard]] static auto from_stream(std::istream& is) -> Feature_Statistics
+    [[nodiscard]] inline static auto from_stream(std::istream& is) -> Feature_Statistics
     {
-        Feature_Statistics stats;
+        Feature_Statistics stats{};
         is.read(reinterpret_cast<char*>(&stats.expected_value), sizeof(stats.expected_value));
         is.read(reinterpret_cast<char*>(&stats.variance), sizeof(stats.variance));
         is.read(reinterpret_cast<char*>(&stats.frequency), sizeof(stats.frequency));
@@ -79,7 +80,9 @@ struct Feature_Statistics {
     [[nodiscard]] static constexpr auto
     from_features(Forward_Iterator first, Forward_Iterator last) -> Feature_Statistics
     {
-        if (first == last) return Feature_Statistics{0, 0, 0};
+        if (first == last) {
+            return Feature_Statistics{0, 0, 0};
+        }
         std::int64_t count{0};
         auto accumulate_feature = [&count](double const& acc, double const& feature) {
             count += 1;
@@ -101,9 +104,9 @@ struct Query_Statistics {
     std::int64_t collection_size;
 };
 
-/// Extimates the number of documents containing **any** of the terms
+/// Estimates the number of documents containing **any** of the terms
 /// represented by `term_stats` in a collection of size `collection_size`.
-[[nodiscard]] auto any(Query_Statistics const& stats) -> double
+[[nodiscard]] inline auto any(Query_Statistics const& stats) -> double
 {
     const auto collection_size = stats.collection_size;
     const double any_product = std::accumulate(
@@ -118,7 +121,7 @@ struct Query_Statistics {
 
 /// Extimates the number of documents containing **all** of the terms
 /// represented by `term_stats` in a collection of size `collection_size`.
-[[nodiscard]] auto all(const Query_Statistics& stats) -> double
+[[nodiscard]] inline auto all(const Query_Statistics& stats) -> double
 {
     double const any = taily::any(stats);
     if (any == 0.0) {
@@ -135,7 +138,7 @@ struct Query_Statistics {
 }
 
 /// Returns a gamma distribution fitted to `term_stats`.
-[[nodiscard]] auto
+[[nodiscard]] inline auto
 fit_distribution(Feature_Statistics const& query_term_stats) -> boost::math::gamma_distribution<>
 {
     double epsilon = std::numeric_limits<double>::epsilon();
@@ -148,7 +151,7 @@ fit_distribution(Feature_Statistics const& query_term_stats) -> boost::math::gam
 /// Returns a gamma distribution fitted to a vector of term stats.
 ///
 /// The term statictics are accumulated before the distribution is fitted.
-[[nodiscard]] auto fit_distribution(std::vector<Feature_Statistics> const& term_stats)
+[[nodiscard]] inline auto fit_distribution(std::vector<Feature_Statistics> const& term_stats)
     -> boost::math::gamma_distribution<>
 {
     Feature_Statistics query_stats = std::accumulate(
@@ -157,10 +160,9 @@ fit_distribution(Feature_Statistics const& query_term_stats) -> boost::math::gam
 }
 
 /// Estimates the global cutoff score for the entire collection.
-[[nodiscard]] auto estimate_cutoff(Query_Statistics const& stats, int ntop) -> double
+[[nodiscard]] inline auto estimate_cutoff(Query_Statistics const& stats, int ntop) -> double
 {
-    if(stats.term_stats.size() == 0)
-    {
+    if (stats.term_stats.empty()) {
         return 0.0;
     }
     auto const dist = fit_distribution(stats.term_stats);
@@ -171,7 +173,8 @@ fit_distribution(Feature_Statistics const& query_term_stats) -> boost::math::gam
 
 /// Calculates the probability that a document in a shard given by `stats`
 /// has a score higher than `cutoff`.
-[[nodiscard]] auto calculate_cdf(double const cutoff, Query_Statistics const& stats) -> double
+[[nodiscard]] inline auto
+calculate_cdf(double const cutoff, Query_Statistics const& stats) -> double
 // [[expects: cutoff >= 0.0]]
 {
     if (cutoff <= 0) {
@@ -192,9 +195,9 @@ fit_distribution(Feature_Statistics const& query_term_stats) -> boost::math::gam
 /// \param shard_stats Term statistics for individual shards
 /// \param ntop The parameter to Taily algorithm saying how many top results we
 /// are shooting for
-[[nodiscard]] auto score_shards(Query_Statistics const& global_stats,
-                                std::vector<Query_Statistics> const& shard_stats,
-                                int const ntop) -> std::vector<double>
+[[nodiscard]] inline auto score_shards(Query_Statistics const& global_stats,
+                                       std::vector<Query_Statistics> const& shard_stats,
+                                       int const ntop) -> std::vector<double>
 {
     int const shard_count = shard_stats.size();
 
